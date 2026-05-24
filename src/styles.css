@@ -1,0 +1,413 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color: #1d232f;
+  background: #f5f7fb;
+  font-family:
+    Inter, Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, -apple-system,
+    BlinkMacSystemFont, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+textarea,
+select,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 22px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: #526071;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  max-width: 760px;
+  color: #101827;
+  font-size: 28px;
+  line-height: 1.22;
+}
+
+h2 {
+  font-size: 18px;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(360px, 1.4fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.script-pane,
+.preview-pane,
+.scene-pane {
+  min-width: 0;
+}
+
+.script-pane,
+.scene-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.pane-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #172033;
+}
+
+.script-input,
+.scene-text,
+.select-input,
+.scene-controls input,
+.scene-controls select {
+  width: 100%;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  outline: none;
+}
+
+.script-input:focus,
+.scene-text:focus,
+.select-input:focus,
+.scene-controls input:focus,
+.scene-controls select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.script-input {
+  min-height: 360px;
+  resize: vertical;
+  padding: 14px;
+  line-height: 1.55;
+}
+
+.field-label {
+  color: #465366;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.select-input {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.primary-button,
+.secondary-button,
+.media-button,
+.download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 0 14px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.secondary-button,
+.media-button {
+  border: 1px solid #d8dee8;
+  background: #ffffff;
+  color: #162033;
+}
+
+.secondary-button.full {
+  width: 100%;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-height: 42px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #e7ebf2;
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: transparent;
+  color: #536174;
+  font-weight: 800;
+}
+
+.segmented button.active {
+  background: #ffffff;
+  color: #172033;
+  box-shadow: 0 1px 6px rgba(22, 32, 51, 0.1);
+}
+
+.hint-box,
+.status-strip,
+.error-box,
+.empty-state {
+  border-radius: 8px;
+  padding: 12px;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.hint-box {
+  background: #e8f2ff;
+  color: #17406c;
+}
+
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.preview-frame {
+  width: min(100%, 560px);
+  max-height: calc(100vh - 190px);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #111214;
+  box-shadow: 0 16px 50px rgba(16, 24, 39, 0.2);
+}
+
+.status-strip {
+  width: min(100%, 560px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.progress-track {
+  width: min(100%, 560px);
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dce3ee;
+}
+
+.progress-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 160ms ease;
+}
+
+.download-link {
+  width: min(100%, 560px);
+  background: #111827;
+  color: #ffffff;
+}
+
+.error-box {
+  width: min(100%, 560px);
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 118px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.scene-item {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.scene-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #506174;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scene-text {
+  min-height: 78px;
+  resize: vertical;
+  padding: 10px;
+  line-height: 1.45;
+}
+
+.scene-controls {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr;
+  gap: 8px;
+}
+
+.scene-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scene-controls input,
+.scene-controls select {
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.media-button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  background: #ffffff;
+  color: #526071;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1180px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .script-input {
+    min-height: 220px;
+  }
+
+  .scene-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell {
+    padding: 14px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+
+  .top-actions,
+  .button-row,
+  .scene-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions,
+  .segmented {
+    width: 100%;
+  }
+
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+}
