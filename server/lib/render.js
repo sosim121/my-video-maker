@@ -62,6 +62,7 @@ export async function renderProjectToMp4({ project, baseUrl, renderId }) {
     outputLocation,
     inputProps,
     browserExecutable,
+    concurrency: 1, // Limit memory footprint on free hosting instances to prevent OOM SIGKILL
     onProgress: ({ progress }) => {
       job.progress = Math.max(job.progress, Math.min(0.99, progress));
     },
