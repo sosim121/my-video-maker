@@ -303,6 +303,9 @@ export const App = () => {
             spellCheck={false}
             className="script-input"
           />
+          <div className="warning-box">
+            ⚠️ 엔터(줄바꿈)를 기준으로 자막과 장면이 나누어집니다. 한 줄이 너무 길면 자막과 음성(TTS)이 너무 길게 재생되므로, 적절히 줄바꿈(엔터)을 해가며 대본을 작성해 주세요.
+          </div>
           <div className="button-row">
             <button className="secondary-button full" onClick={createProject} disabled={isBusy}>
               <Save size={18} />

@@ -31,7 +31,7 @@ test("API smoke flow creates TTS, uploads narration, and attaches scene media", 
     await waitForServer(logs);
 
     const created = await postJson("/api/projects", {
-      script: "첫 장면입니다. 둘째 장면입니다.",
+      script: "첫 장면입니다.\n둘째 장면입니다.",
       aspectRatio: "landscape",
     });
     assert.equal(created.project.aspectRatio, "landscape");

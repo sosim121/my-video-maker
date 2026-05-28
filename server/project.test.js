@@ -6,12 +6,9 @@ import {
   splitScript,
 } from "./lib/project.js";
 
-test("splitScript handles Korean and English punctuation", () => {
+test("splitScript splits strictly by newlines, keeping punctuation intact on a single line", () => {
   assert.deepEqual(splitScript("안녕하세요. 오늘은 테스트입니다! Is this working? Yes."), [
-    "안녕하세요.",
-    "오늘은 테스트입니다!",
-    "Is this working?",
-    "Yes.",
+    "안녕하세요. 오늘은 테스트입니다! Is this working? Yes.",
   ]);
 });
 
@@ -24,7 +21,7 @@ test("splitScript ignores empty lines and trims text", () => {
 
 test("createProjectFromScript computes scene starts", () => {
   const project = createProjectFromScript({
-    script: "하나입니다. 둘입니다.",
+    script: "하나입니다.\n둘입니다.",
     aspectRatio: "landscape",
   });
 
@@ -36,7 +33,7 @@ test("createProjectFromScript computes scene starts", () => {
 
 test("applyUploadedNarrationTiming distributes duration by text length", () => {
   const project = createProjectFromScript({
-    script: "짧다. 이것은 훨씬 더 긴 문장입니다.",
+    script: "짧다.\n이것은 훨씬 더 긴 문장입니다.",
     aspectRatio: "portrait",
   });
   const timed = applyUploadedNarrationTiming(project, 10);
@@ -45,27 +42,11 @@ test("applyUploadedNarrationTiming distributes duration by text length", () => {
   assert.ok(timed.scenes[1].duration > timed.scenes[0].duration);
 });
 
-test("splitScript splits very long sentences without punctuation dynamically at space boundaries", () => {
-  const longSentence = "이것은 종결부호가 아예 없는 아주 긴 문장이며 자동으로 적절한 글자 수 범위의 공백에서 쪼개져야 합니다";
-  // Length is 57, which is > 40.
-  // It should split into two chunks.
+test("splitScript does not split long sentences without newlines", () => {
+  const longSentence = "이것은 종결부호나 쉼표가 있더라도 줄바꿈이 없으면 절대 쪼개지지 않고 온전히 하나의 자막으로 유지되어야 하는 아주 긴 테스트 문장입니다.";
   const chunks = splitScript(longSentence);
-  assert.ok(chunks.length >= 2);
-  chunks.forEach(chunk => {
-    assert.ok(chunk.length <= 40);
-  });
-});
-
-test("splitScript splits very long sentences at comma when available", () => {
-  const longSentenceWithComma = "이것은 아주 긴 문장이며 쉼표가 있을 때, 그 쉼표의 위치를 기준으로 우선하여 분할하는 테스트 문장입니다";
-  // Length is 58, which is > 40.
-  const chunks = splitScript(longSentenceWithComma);
-  assert.ok(chunks.length >= 2);
-  chunks.forEach(chunk => {
-    assert.ok(chunk.length <= 40);
-  });
-  // Should split near the comma
-  assert.ok(chunks[0].includes("쉼표가 있을 때,"));
+  assert.equal(chunks.length, 1);
+  assert.equal(chunks[0], longSentence);
 });
 
 test("synthesizeGoogleTts downloads audio successfully and returns duration", async () => {

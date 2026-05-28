@@ -215,7 +215,8 @@ h2 {
 .hint-box,
 .status-strip,
 .error-box,
-.empty-state {
+.empty-state,
+.warning-box {
   border-radius: 8px;
   padding: 12px;
   line-height: 1.45;
@@ -225,6 +226,14 @@ h2 {
 .hint-box {
   background: #e8f2ff;
   color: #17406c;
+}
+
+.warning-box {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  margin-top: 8px;
+  margin-bottom: 12px;
 }
 
 .preview-pane {

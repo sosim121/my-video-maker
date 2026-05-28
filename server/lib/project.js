@@ -7,80 +7,14 @@ export const ASPECTS = {
   landscape: { label: "가로 16:9", width: 1920, height: 1080 },
 };
 
-const MAX_SCENE_CHARS = 40;
-
 export function splitScript(script) {
-  const normalized = String(script ?? "")
+  if (!script) return [];
+
+  return String(script)
     .replace(/\r/g, "")
     .split(/\n+/)
     .map((line) => line.trim())
-    .filter(Boolean)
-    .join(" ");
-
-  if (!normalized) {
-    return [];
-  }
-
-  const sentenceMatches =
-    normalized.match(/[^.!?。！？…]+[.!?。！？…]+["'”’)]*|[^.!?。！？…]+$/g) ?? [];
-
-  return sentenceMatches.flatMap((sentence) => splitLongSentence(sentence.trim())).filter(Boolean);
-}
-
-function splitLongSentence(sentence) {
-  if (sentence.length <= MAX_SCENE_CHARS) {
-    return [sentence];
-  }
-
-  const parts = sentence
-    .split(/([,，;；:：])\s*/)
-    .reduce((acc, part, index, arr) => {
-      if (index % 2 === 0) {
-        const punctuation = arr[index + 1] ?? "";
-        acc.push(`${part}${punctuation}`.trim());
-      }
-      return acc;
-    }, [])
     .filter(Boolean);
-
-  if (parts.length <= 1) {
-    return chunkByLength(sentence, MAX_SCENE_CHARS);
-  }
-
-  const chunks = [];
-  let current = "";
-  for (const part of parts) {
-    const next = current ? `${current} ${part}` : part;
-    if (next.length > MAX_SCENE_CHARS && current) {
-      chunks.push(current);
-      current = part;
-    } else {
-      current = next;
-    }
-  }
-  if (current) {
-    chunks.push(current);
-  }
-  return chunks.flatMap((chunk) =>
-    chunk.length > MAX_SCENE_CHARS ? chunkByLength(chunk, MAX_SCENE_CHARS) : [chunk],
-  );
-}
-
-function chunkByLength(text, size) {
-  const chunks = [];
-  let remaining = text.trim();
-  while (remaining.length > size) {
-    const slice = remaining.slice(0, size);
-    const breakAt = Math.max(slice.lastIndexOf(" "), slice.lastIndexOf("　"));
-    const minBreak = Math.floor(size * 0.6);
-    const index = breakAt > minBreak ? breakAt : size;
-    chunks.push(remaining.slice(0, index).trim());
-    remaining = remaining.slice(index).trim();
-  }
-  if (remaining) {
-    chunks.push(remaining);
-  }
-  return chunks;
 }
 
 export function estimateSceneDuration(text) {

@@ -3,3 +3,4 @@ dist/
 storage/
 .cache/
 *.log
+bin/
