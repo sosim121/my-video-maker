@@ -8,11 +8,12 @@ const PORT = 5200;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
-const server = spawn(process.execPath, ["server/index.js", "--production"], {
+const server = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
   env: {
     ...process.env,
     PORT: String(PORT),
+    NODE_ENV: "test",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });

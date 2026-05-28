@@ -1,14 +1,15 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   AbsoluteFill,
+  Audio,
   Img,
   Sequence,
   Series,
+  Video,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { Audio, Video } from "@remotion/media";
 import { FPS, demoProject } from "../lib/video.js";
 
 export const ScriptVideo = ({ project = demoProject }) => {
@@ -65,8 +66,26 @@ const SceneFrame = ({ scene, index, asset, ttsAsset, playSceneTts }) => {
   );
 };
 
-const MediaLayer = ({ asset, fitMode = "cover", index, progress }) => {
+const MediaLayer = React.memo(({ asset, fitMode = "cover", index, progress }) => {
   const fit = fitMode === "contain" ? "contain" : "cover";
+
+  // Static video style depends only on `fit` (no per-frame animation).
+  const videoStyle = useMemo(() => ({ ...styles.media, objectFit: fit }), [fit]);
+
+  // Gradient + placeholder styles depend only on `index`, not on the frame.
+  const placeholder = useMemo(() => {
+    const hue = (index * 43) % 360;
+    return {
+      containerStyle: {
+        ...styles.placeholder,
+        background: `linear-gradient(135deg, hsl(${hue} 32% 16%), hsl(${(hue + 95) % 360} 38% 26%))`,
+      },
+      lineStyle2: { ...styles.placeholderLine, width: "42%", opacity: 0.42 },
+      lineStyle3: { ...styles.placeholderLine, width: "58%", opacity: 0.3 },
+    };
+  }, [index]);
+
+  // Ken-Burns transform legitimately changes per frame (driven by `progress`).
   const transform = `scale(${1.03 - progress * 0.03})`;
 
   if (asset?.type === "image") {
@@ -88,28 +107,19 @@ const MediaLayer = ({ asset, fitMode = "cover", index, progress }) => {
         src={asset.url}
         muted
         loop
-        style={{
-          ...styles.media,
-          objectFit: fit,
-        }}
+        style={videoStyle}
       />
     );
   }
 
-  const hue = (index * 43) % 360;
   return (
-    <AbsoluteFill
-      style={{
-        ...styles.placeholder,
-        background: `linear-gradient(135deg, hsl(${hue} 32% 16%), hsl(${(hue + 95) % 360} 38% 26%))`,
-      }}
-    >
+    <AbsoluteFill style={placeholder.containerStyle}>
       <div style={styles.placeholderLine} />
-      <div style={{ ...styles.placeholderLine, width: "42%", opacity: 0.42 }} />
-      <div style={{ ...styles.placeholderLine, width: "58%", opacity: 0.3 }} />
+      <div style={placeholder.lineStyle2} />
+      <div style={placeholder.lineStyle3} />
     </AbsoluteFill>
   );
-};
+});
 
 const styles = {
   stage: {

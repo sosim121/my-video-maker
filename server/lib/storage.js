@@ -22,9 +22,24 @@ export function projectPath(projectId) {
   return path.join(PROJECTS_DIR, `${projectId}.json`);
 }
 
+export class ProjectNotFoundError extends Error {
+  constructor(projectId) {
+    super(`프로젝트를 찾을 수 없어요.`);
+    this.code = "PROJECT_NOT_FOUND";
+    this.projectId = projectId;
+  }
+}
+
 export async function readProject(projectId) {
-  const raw = await fs.readFile(projectPath(projectId), "utf8");
-  return JSON.parse(raw);
+  try {
+    const raw = await fs.readFile(projectPath(projectId), "utf8");
+    return JSON.parse(raw);
+  } catch (err) {
+    if (err && err.code === "ENOENT") {
+      throw new ProjectNotFoundError(projectId);
+    }
+    throw err;
+  }
 }
 
 export async function saveProject(project) {

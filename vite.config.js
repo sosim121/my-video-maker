@@ -9,5 +9,25 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: ["log", "debug", "info"],
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (/[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "react-vendor";
+            if (id.includes("mediabunny")) return "remotion-media";
+            if (/[\\/](@remotion|remotion)[\\/]/.test(id)) return "remotion";
+            if (id.includes("lucide-react")) return "icons";
+            return "vendor";
+          }
+        },
+      },
+    },
   },
 });
