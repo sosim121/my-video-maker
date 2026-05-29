@@ -10,11 +10,12 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 const ROOT = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 
 test("API smoke flow creates TTS, uploads narration, and attaches scene media", { timeout: 90000 }, async () => {
-  const server = spawn(process.execPath, ["server/index.js", "--production"], {
+  const server = spawn(process.execPath, ["server/index.js"], {
     cwd: ROOT,
     env: {
       ...process.env,
       PORT: String(PORT),
+      NODE_ENV: "test",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -46,7 +47,12 @@ test("API smoke flow creates TTS, uploads narration, and attaches scene media", 
     const firstAudio = Object.values(tts.project.assets).find((asset) => asset.type === "audio");
     const audioBytes = await fs.readFile(firstAudio.path);
     const narrationForm = new FormData();
-    narrationForm.append("file", new Blob([audioBytes], { type: "audio/wav" }), "narration.wav");
+    const isMp3 = firstAudio.mimeType === "audio/mpeg" || firstAudio.path.endsWith(".mp3");
+    narrationForm.append(
+      "file",
+      new Blob([audioBytes], { type: isMp3 ? "audio/mpeg" : "audio/wav" }),
+      isMp3 ? "narration.mp3" : "narration.wav",
+    );
     const narration = await postForm(`/api/projects/${created.project.id}/narration`, narrationForm);
     assert.equal(narration.project.voiceTrack.mode, "uploaded");
 

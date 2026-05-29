@@ -1,7 +1,29 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 import { parseFile } from "music-metadata";
 
-export function getAssetType(mimeType) {
+const EXTENSION_TYPES = {
+  ".png": "image",
+  ".jpg": "image",
+  ".jpeg": "image",
+  ".gif": "image",
+  ".webp": "image",
+  ".bmp": "image",
+  ".mp4": "video",
+  ".mov": "video",
+  ".webm": "video",
+  ".mkv": "video",
+  ".avi": "video",
+  ".m4v": "video",
+  ".mp3": "audio",
+  ".wav": "audio",
+  ".m4a": "audio",
+  ".aac": "audio",
+  ".ogg": "audio",
+  ".flac": "audio",
+};
+
+export function getAssetType(mimeType, filename) {
   if (mimeType?.startsWith("image/")) {
     return "image";
   }
@@ -11,7 +33,24 @@ export function getAssetType(mimeType) {
   if (mimeType?.startsWith("audio/")) {
     return "audio";
   }
+  if (filename) {
+    const ext = path.extname(String(filename)).toLowerCase();
+    if (EXTENSION_TYPES[ext]) {
+      return EXTENSION_TYPES[ext];
+    }
+  }
   return "file";
+}
+
+export function decodeMulterFilename(name) {
+  if (typeof name !== "string") return "asset";
+  try {
+    const decoded = Buffer.from(name, "latin1").toString("utf8");
+    if (decoded.includes("�")) return name;
+    return decoded;
+  } catch {
+    return name;
+  }
 }
 
 export async function getMediaDuration(filePath) {
@@ -58,10 +97,11 @@ export async function getWavDuration(filePath) {
 }
 
 export function sanitizeFilename(name) {
-  const cleaned = String(name ?? "asset")
-    .normalize("NFKD")
-    .replace(/[^\w.\-가-힣]+/g, "-")
+  const base = path.basename(String(name ?? "asset"));
+  const cleaned = base
+    .replace(/\.\.+/g, ".")
+    .replace(/[^\p{L}\p{N}.\-_]+/gu, "-")
     .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replace(/^[-.]+|[-.]+$/g, "");
   return cleaned || "asset";
 }

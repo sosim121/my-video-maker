@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Player } from "@remotion/player";
+import React, {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Ban,
   Download,
@@ -13,7 +20,6 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { ScriptVideo } from "./remotion/ScriptVideo.jsx";
 import {
   ASPECTS,
   FPS,
@@ -22,8 +28,22 @@ import {
   getProjectFrames,
 } from "./lib/video.js";
 
+const Player = lazy(() =>
+  import("@remotion/player").then((m) => ({ default: m.Player })),
+);
+const ScriptVideo = lazy(() =>
+  import("./remotion/ScriptVideo.jsx").then((m) => ({ default: m.ScriptVideo })),
+);
+
 const defaultScript =
   "오늘은 로컬에서 무료로 영상을 만드는 방법을 보여드리겠습니다. 스크립트를 넣으면 자막과 음성이 먼저 만들어집니다. 이후 원하는 이미지와 영상을 장면마다 넣고 mp4로 내보낼 수 있습니다.";
+
+// Helper to count characters and detect English vs Korean (module scope: stable, off the render hot path)
+const isEnglishText = (text) => {
+  const englishCount = (text.match(/[a-zA-Z]/g) || []).length;
+  const koreanCount = (text.match(/[가-힣]/g) || []).length;
+  return englishCount > koreanCount;
+};
 
 export const App = () => {
   const [script, setScript] = useState(defaultScript);
@@ -36,20 +56,24 @@ export const App = () => {
   const [render, setRender] = useState(null);
   const [error, setError] = useState("");
   const narrationInputRef = useRef(null);
+  // Latest project, readable from stable (useCallback) handlers without adding `project` as a dep.
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
+  // Holds the pending debounced PATCH timer so rapid scene edits coalesce into one request.
+  const saveTimerRef = useRef(null);
 
-  const previewProject = project ?? { ...demoProject, aspectRatio };
+  const previewProject = useMemo(
+    () => project ?? { ...demoProject, aspectRatio },
+    [project, aspectRatio],
+  );
   const dimensions = useMemo(
     () => getProjectDimensions(previewProject.aspectRatio),
     [previewProject.aspectRatio],
   );
   const durationInFrames = useMemo(() => getProjectFrames(previewProject), [previewProject]);
-
-  // Helper to count characters and detect English vs Korean
-  const isEnglishText = (text) => {
-    const englishCount = (text.match(/[a-zA-Z]/g) || []).length;
-    const koreanCount = (text.match(/[\uac00-\ud7a3]/g) || []).length;
-    return englishCount > koreanCount;
-  };
+  const playerInputProps = useMemo(() => ({ project: previewProject }), [previewProject]);
 
   useEffect(() => {
     fetch("/api/voices")
@@ -73,22 +97,33 @@ export const App = () => {
       });
   }, []);
 
-  // Auto-detect language and set appropriate voice dynamically
+  // Keep latest selectedVoice readable from the debounced detector without resetting its timer.
+  const selectedVoiceRef = useRef(selectedVoice);
+  useEffect(() => {
+    selectedVoiceRef.current = selectedVoice;
+  }, [selectedVoice]);
+
+  // Auto-detect language and set appropriate voice dynamically.
+  // Debounced ~300ms so the regex scans run after typing stops, not on every keystroke.
   useEffect(() => {
     if (voices.length === 0) return;
 
-    const detectedEn = isEnglishText(script);
-    const targetLang = detectedEn ? "en" : "ko";
+    const timer = window.setTimeout(() => {
+      const detectedEn = isEnglishText(script);
+      const targetLang = detectedEn ? "en" : "ko";
 
-    const currentVoiceObj = voices.find((v) => v.name === selectedVoice);
-    if (!currentVoiceObj || !currentVoiceObj.culture?.toLowerCase().startsWith(targetLang)) {
-      const matchedVoice = voices.find((v) =>
-        v.culture?.toLowerCase().startsWith(targetLang)
-      );
-      if (matchedVoice) {
-        setSelectedVoice(matchedVoice.name);
+      const currentVoiceObj = voices.find((v) => v.name === selectedVoiceRef.current);
+      if (!currentVoiceObj || !currentVoiceObj.culture?.toLowerCase().startsWith(targetLang)) {
+        const matchedVoice = voices.find((v) =>
+          v.culture?.toLowerCase().startsWith(targetLang)
+        );
+        if (matchedVoice) {
+          setSelectedVoice(matchedVoice.name);
+        }
       }
-    }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
   }, [script, voices]);
 
   useEffect(() => {
@@ -96,22 +131,61 @@ export const App = () => {
       return;
     }
 
-    const timer = window.setInterval(async () => {
-      const data = await api(`/api/renders/${render.id}`);
-      setRender(data.render);
+    let aborted = false;
+    let timer;
+    let attempt = 0;
+
+    const poll = async () => {
+      let data;
+      try {
+        data = await api(`/api/renders/${render.id}`);
+      } catch {
+        if (aborted) return;
+        attempt += 1;
+        timer = window.setTimeout(poll, Math.min(1200 + attempt * 400, 5000));
+        return;
+      }
+      if (aborted) return;
+
+      // Terminal states: do all the work, THEN setRender last. setRender flips
+      // render.status, which re-runs this effect; doing it last means the effect's
+      // cleanup can't abort the in-flight completion handling above.
       if (data.render.status === "completed") {
-        const refreshed = await api(`/api/projects/${data.render.projectId}`);
-        setProject(refreshed.project);
+        let refreshed;
+        try {
+          refreshed = await api(`/api/projects/${data.render.projectId}`);
+        } catch {
+          /* keep going — render itself succeeded */
+        }
+        if (aborted) return;
+        if (refreshed) setProject(refreshed.project);
         setStatus("mp4가 완성되었습니다.");
+        setRender(data.render);
+        return;
       }
       if (data.render.status === "failed") {
         setStatus("");
         setError(data.render.error || "렌더링에 실패했습니다.");
+        setRender(data.render);
+        return;
       }
-    }, 1200);
 
-    return () => window.clearInterval(timer);
-  }, [render]);
+      // Still rendering: update progress (same status → effect won't re-run) and
+      // keep polling with light linear backoff: 1.2s base, +0.4s/attempt, capped 5s.
+      setRender(data.render);
+      attempt += 1;
+      timer = window.setTimeout(poll, Math.min(1200 + attempt * 400, 5000));
+    };
+
+    timer = window.setTimeout(poll, 1200);
+
+    return () => {
+      aborted = true;
+      window.clearTimeout(timer);
+    };
+    // Depend only on id/status — progress updates from poll() shouldn't tear down
+    // and recreate the effect (which would reset the backoff every tick).
+  }, [render?.id, render?.status]);
 
   const createProject = async () => {
     setError("");
@@ -188,8 +262,9 @@ export const App = () => {
     }
   };
 
-  const uploadSceneMedia = async (sceneId, file) => {
-    if (!project || !file) {
+  const uploadSceneMedia = useCallback(async (sceneId, file) => {
+    const current = projectRef.current;
+    if (!current || !file) {
       return;
     }
     setError("");
@@ -197,7 +272,7 @@ export const App = () => {
     try {
       const form = new FormData();
       form.append("file", file);
-      const data = await api(`/api/projects/${project.id}/scenes/${sceneId}/media`, {
+      const data = await api(`/api/projects/${current.id}/scenes/${sceneId}/media`, {
         method: "POST",
         body: form,
         json: false,
@@ -208,9 +283,9 @@ export const App = () => {
       setError(err.message);
       setStatus("");
     }
-  };
+  }, []);
 
-  const saveProjectEdits = async (nextProject = project) => {
+  const saveProjectEdits = useCallback(async (nextProject = projectRef.current) => {
     if (!nextProject) {
       return;
     }
@@ -229,20 +304,40 @@ export const App = () => {
     } catch (err) {
       setError(err.message);
     }
-  };
+  }, []);
 
-  const updateScene = (sceneId, patch) => {
-    if (!project) {
-      return;
+  // Debounced PATCH save (~500ms): rapid blur/duration/fitMode edits coalesce into one request,
+  // and the timer always flushes the latest project (read from projectRef at fire time).
+  const debouncedSaveProjectEdits = useCallback(() => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
     }
-    const nextProject = {
-      ...project,
-      scenes: project.scenes.map((scene) =>
-        scene.id === sceneId ? { ...scene, ...patch } : scene,
-      ),
-    };
-    setProject(nextProject);
-  };
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      saveProjectEdits();
+    }, 500);
+  }, [saveProjectEdits]);
+
+  // Cancel any pending debounced save on unmount.
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+  }, []);
+
+  const updateScene = useCallback((sceneId, patch) => {
+    setProject((current) => {
+      if (!current) {
+        return current;
+      }
+      return {
+        ...current,
+        scenes: current.scenes.map((scene) =>
+          scene.id === sceneId ? { ...scene, ...patch } : scene,
+        ),
+      };
+    });
+  }, []);
 
   const renderMp4 = async () => {
     if (!project) {
@@ -266,8 +361,9 @@ export const App = () => {
 
   const changeAspect = async (nextAspect) => {
     setAspectRatio(nextAspect);
-    if (project) {
-      await saveProjectEdits({ ...project, aspectRatio: nextAspect });
+    const current = projectRef.current;
+    if (current) {
+      await saveProjectEdits({ ...current, aspectRatio: nextAspect });
     }
   };
 
@@ -351,16 +447,18 @@ export const App = () => {
 
         <section className="preview-pane">
           <div className="preview-frame" style={{ aspectRatio: `${dimensions.width} / ${dimensions.height}` }}>
-            <Player
-              component={ScriptVideo}
-              inputProps={{ project: previewProject }}
-              durationInFrames={durationInFrames}
-              compositionWidth={dimensions.width}
-              compositionHeight={dimensions.height}
-              fps={FPS}
-              controls
-              style={{ width: "100%", height: "100%" }}
-            />
+            <Suspense fallback={<div className="preview-frame" />}>
+              <Player
+                component={ScriptVideo}
+                inputProps={playerInputProps}
+                durationInFrames={durationInFrames}
+                compositionWidth={dimensions.width}
+                compositionHeight={dimensions.height}
+                fps={FPS}
+                controls
+                style={{ width: "100%", height: "100%" }}
+              />
+            </Suspense>
           </div>
           <div className="status-strip">
             <span>{status || "스크립트를 넣고 초기 영상을 생성해 주세요."}</span>
@@ -392,12 +490,13 @@ export const App = () => {
               project.scenes.map((scene, index) => (
                 <SceneEditor
                   key={scene.id}
+                  sceneId={scene.id}
                   scene={scene}
                   index={index}
                   asset={project.assets?.[scene.mediaAssetId]}
-                  onChange={(patch) => updateScene(scene.id, patch)}
-                  onSave={() => saveProjectEdits()}
-                  onUpload={(file) => uploadSceneMedia(scene.id, file)}
+                  onChange={updateScene}
+                  onSave={debouncedSaveProjectEdits}
+                  onUpload={uploadSceneMedia}
                 />
               ))
             )}
@@ -421,7 +520,7 @@ const SegmentedAspect = ({ value, onChange }) => (
   </div>
 );
 
-const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
+const SceneEditor = React.memo(({ sceneId, scene, index, asset, onChange, onSave, onUpload }) => {
   const inputRef = useRef(null);
 
   return (
@@ -432,7 +531,7 @@ const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
       </div>
       <textarea
         value={scene.text}
-        onChange={(event) => onChange({ text: event.target.value })}
+        onChange={(event) => onChange(sceneId, { text: event.target.value })}
         onBlur={onSave}
         className="scene-text"
       />
@@ -444,7 +543,7 @@ const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
             min="0.5"
             step="0.1"
             value={scene.duration}
-            onChange={(event) => onChange({ duration: Number(event.target.value) })}
+            onChange={(event) => onChange(sceneId, { duration: Number(event.target.value) })}
             onBlur={onSave}
           />
         </label>
@@ -453,7 +552,7 @@ const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
           <select
             value={scene.fitMode}
             onChange={(event) => {
-              onChange({ fitMode: event.target.value });
+              onChange(sceneId, { fitMode: event.target.value });
               window.setTimeout(onSave, 0);
             }}
           >
@@ -467,7 +566,7 @@ const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
         className="hidden-input"
         type="file"
         accept="image/*,video/*"
-        onChange={(event) => onUpload(event.target.files?.[0])}
+        onChange={(event) => onUpload(sceneId, event.target.files?.[0])}
       />
       <button className="media-button" onClick={() => inputRef.current?.click()}>
         <Upload size={17} />
@@ -475,7 +574,7 @@ const SceneEditor = ({ scene, index, asset, onChange, onSave, onUpload }) => {
       </button>
     </article>
   );
-};
+});
 
 function renderLabel(render) {
   if (render.status === "failed") {
